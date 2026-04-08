@@ -4,16 +4,7 @@ import { sessionsService } from "../../services/sessions.service";
 import { OutboundMessage } from "../../services/messages.service";
 import { registrationFlow } from "./registration.flow";
 import { env } from "../../config/env";
-
-const NEW_BUSINESS_TRIGGERS = [
-  "nuevo negocio",
-  "registrar negocio",
-  "agregar negocio",
-  "otro negocio",
-];
-
-const OPEN_TRIGGERS = ["abrir", "abrir negocio", "abierto", "ya abri", "ya abrí"];
-const CLOSE_TRIGGERS = ["cerrar", "cerrar negocio", "cerrado", "ya cerre", "ya cerré"];
+import { detectIntent } from "./intents";
 
 const ASK_BUSINESS_COPY = "Ahora dime, ¿cuál es el *nombre de tu negocio*?";
 
@@ -80,10 +71,10 @@ export async function handleIncomingMessage({
   const hasCompany = await companiesService.hasCompanyForContact(contact.id);
 
   if (hasCompany && !session) {
-    const wantsOpen = OPEN_TRIGGERS.includes(lower);
-    const wantsClose = CLOSE_TRIGGERS.includes(lower);
-    if (wantsOpen || wantsClose) {
-      const status: "OPEN" | "CLOSED" = wantsOpen ? "OPEN" : "CLOSED";
+    const intent = detectIntent(effectiveBody);
+    if (intent?.name === "open_business" || intent?.name === "close_business") {
+      const status: "OPEN" | "CLOSED" =
+        intent.name === "open_business" ? "OPEN" : "CLOSED";
       const companies = await companiesService.listForContact(contact.id);
       if (companies.length === 1) {
         await companiesService.setStatus(companies[0].id, status);
@@ -95,7 +86,7 @@ export async function handleIncomingMessage({
       await sessionsService.set(from, "pick_company_status", { status });
       return { kind: "text", body: pickCompanyText(companies, status) };
     }
-    if (NEW_BUSINESS_TRIGGERS.includes(lower)) {
+    if (intent?.name === "new_business") {
       await sessionsService.set(from, "ask_business", {
         display_name: contact.display_name ?? undefined,
       });

@@ -7,6 +7,8 @@ import { OutboundMessage } from "../../services/messages.service";
 import { env } from "../../config/env";
 
 type Step =
+  | "menu_existing"
+  | "pick_company_status"
   | "ask_name"
   | "ask_business"
   | "ask_category"
@@ -24,6 +26,7 @@ interface FlowData {
   industry_name?: string;
   location_text?: string | null;
   business_phone?: string | null;
+  status?: "OPEN" | "CLOSED";
 }
 
 const YES = ["si", "sí", "s", "yes", "y", "claro", "ok", "okay", "dale", "va"];
@@ -123,6 +126,37 @@ export const registrationFlow = {
     const data: FlowData = session.data ?? {};
 
     switch (step) {
+      case "pick_company_status": {
+        const status = data.status ?? "OPEN";
+        const verb = status === "OPEN" ? "abierto" : "cerrado";
+        const companies = await companiesService.listForContact(contact.id);
+        const n = parseInt(raw, 10);
+        if (Number.isNaN(n) || n < 1 || n > companies.length) {
+          const list = companies.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
+          return text(
+            `Necesito el número del negocio. Intenta de nuevo:\n\n${list}`
+          );
+        }
+        const chosen = companies[n - 1];
+        await companiesService.setStatus(chosen.id, status);
+        await sessionsService.reset(waFrom);
+        return text(`✅ *${chosen.name}* quedó marcado como *${verb}*.`);
+      }
+
+      case "menu_existing": {
+        if (isYes(lower)) {
+          await sessionsService.set(waFrom, "ask_business", {
+            display_name: contact.display_name ?? undefined,
+          });
+          return text(COPY.ask_business);
+        }
+        if (isNo(lower)) {
+          await sessionsService.reset(waFrom);
+          return text("Ok, aquí estaré cuando quieras 👋");
+        }
+        return yesNo("¿Quieres registrar *otro negocio*?");
+      }
+
       case "ask_name": {
         if (!raw) return text("Necesito tu nombre para continuar 🙂. ¿Cómo te llamas?");
         const clean = await normalizeAnswer("person_name", raw);
@@ -239,7 +273,7 @@ export const registrationFlow = {
           });
           await sessionsService.reset(waFrom);
           return text(
-            `🎉 ¡Listo, *${data.business_name}* quedó registrado!\nMuy pronto vas a poder activar herramientas para tu negocio. Escribe *hola* cuando quieras volver.`
+            `🎉 ¡Listo, *${data.business_name}* quedó registrado!\nSi quieres agregar otro negocio, escríbeme *nuevo negocio*.`
           );
         }
         if (isNo(lower)) {

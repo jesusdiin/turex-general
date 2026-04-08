@@ -1,11 +1,14 @@
 import { supabase } from "./supabase";
 
+export type CompanyStatus = "OPEN" | "CLOSED";
+
 export interface Company {
   id: string;
   name: string;
   industry_id: string;
   location_text: string | null;
   business_phone: string | null;
+  status: CompanyStatus;
 }
 
 export const companiesService = {
@@ -16,6 +19,26 @@ export const companiesService = {
       .eq("contact_id", contactId);
     if (error) throw error;
     return (count ?? 0) > 0;
+  },
+
+  async listForContact(contactId: string): Promise<Company[]> {
+    const { data, error } = await supabase
+      .from("company_contacts")
+      .select("companies(*)")
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return ((data ?? [])
+      .map((r: { companies: Company | null }) => r.companies)
+      .filter(Boolean) as Company[]);
+  },
+
+  async setStatus(companyId: string, status: CompanyStatus): Promise<void> {
+    const { error } = await supabase
+      .from("companies")
+      .update({ status })
+      .eq("id", companyId);
+    if (error) throw error;
   },
 
   async createForContact(

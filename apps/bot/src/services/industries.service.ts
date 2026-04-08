@@ -6,12 +6,27 @@ export interface Industry {
   name: string;
 }
 
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+// Keywords ya normalizadas (sin acentos, lowercase)
 const KEYWORDS: Record<string, string[]> = {
-  hotel: ["hotel", "hostal", "posada", "alojamiento", "hospedaje", "cabaña", "cabana"],
+  hotel: [
+    "hotel", "hostal", "posada", "alojamiento", "hospedaje",
+    "cabana", "motel", "airbnb", "hospedar",
+  ],
   restaurant: [
-    "taco", "tacos", "restauran", "comida", "comidas", "bar", "café", "cafe",
-    "cafeteria", "cafetería", "pizzer", "parrilla", "puesto", "cocina",
-    "quesadilla", "burrito", "hamburgues", "sushi", "panaderia", "panadería",
+    "taco", "tacos", "taqueria", "restaurante", "restauran",
+    "comida", "comidas", "bar", "cafe", "cafeteria",
+    "pizza", "pizzeria", "parrilla", "puesto", "cocina",
+    "quesadilla", "burrito", "tortas", "torta", "hamburguesa",
+    "hamburguesas", "sushi", "panaderia", "pasteleria",
+    "dulceria", "antojitos", "loncheria", "marisqueria",
+    "mariscos", "pollo", "pollos", "asados", "fonda",
   ],
 };
 
@@ -29,14 +44,22 @@ async function list(): Promise<Industry[]> {
   return cache.data;
 }
 
+function matches(textNorm: string, keyword: string): boolean {
+  if (keyword.length >= 4) {
+    const re = new RegExp(`\\b${keyword}\\b`, "i");
+    return re.test(textNorm);
+  }
+  return textNorm.includes(keyword);
+}
+
 async function inferFromText(
   text: string
 ): Promise<{ industry: Industry; matched: string } | null> {
-  const t = text.toLowerCase();
+  const t = normalize(text);
   const industries = await list();
   for (const ind of industries) {
     const kws = KEYWORDS[ind.slug] ?? [];
-    const hit = kws.find((k) => t.includes(k));
+    const hit = kws.find((k) => matches(t, k));
     if (hit) return { industry: ind, matched: hit };
   }
   return null;

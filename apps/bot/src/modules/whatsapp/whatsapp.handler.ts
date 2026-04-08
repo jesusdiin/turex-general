@@ -2,7 +2,7 @@ import { contactsService, phoneFromWaFrom } from "../../services/contacts.servic
 import { companiesService } from "../../services/companies.service";
 import { sessionsService } from "../../services/sessions.service";
 import { OutboundMessage } from "../../services/messages.service";
-import { registrationFlow } from "./registration.flow";
+import { registrationFlow, pickCompanyMessage } from "./registration.flow";
 import { env } from "../../config/env";
 import { detectIntent } from "./intents";
 
@@ -10,11 +10,6 @@ const ASK_BUSINESS_COPY = "Ahora dime, ¿cuál es el *nombre de tu negocio*?";
 
 function statusVerb(s: "OPEN" | "CLOSED"): string {
   return s === "OPEN" ? "abierto" : "cerrado";
-}
-
-function pickCompanyText(companies: { name: string }[], status: "OPEN" | "CLOSED"): string {
-  const list = companies.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
-  return `¿Qué negocio quieres marcar como *${statusVerb(status)}*? Responde con el *número*:\n\n${list}`;
 }
 
 function menuExistingMessage(): OutboundMessage {
@@ -40,6 +35,9 @@ const PAYLOAD_TO_TEXT: Record<string, string> = {
   yes: "sí",
   no: "no",
   other: "otro",
+  pick_1: "1",
+  pick_2: "2",
+  pick_3: "3",
 };
 
 export async function handleIncomingMessage({
@@ -83,8 +81,11 @@ export async function handleIncomingMessage({
           body: `✅ *${companies[0].name}* quedó marcado como *${statusVerb(status)}*.`,
         };
       }
-      await sessionsService.set(from, "pick_company_status", { status });
-      return { kind: "text", body: pickCompanyText(companies, status) };
+      await sessionsService.set(from, "pick_company_status", {
+        status,
+        company_ids: companies.map((c) => c.id),
+      });
+      return pickCompanyMessage(companies, status);
     }
     if (intent?.name === "new_business") {
       await sessionsService.set(from, "ask_business", {

@@ -2,7 +2,12 @@ import { contactsService, WaContact, phoneFromWaFrom } from "../../services/cont
 import { industriesService, Industry } from "../../services/industries.service";
 import { companiesService } from "../../services/companies.service";
 import { sessionsService, WaSession } from "../../services/sessions.service";
-import { normalizeAnswer, personalizeIntro } from "../../services/llm.service";
+import {
+  normalizeAnswer,
+  personalizeIntro,
+  extractRegistrationFields,
+  ExtractedFields,
+} from "../../services/llm.service";
 import { OutboundMessage } from "../../services/messages.service";
 import { env } from "../../config/env";
 
@@ -27,6 +32,7 @@ interface FlowData {
   location_text?: string | null;
   business_phone?: string | null;
   status?: "OPEN" | "CLOSED";
+  company_ids?: string[];
 }
 
 const YES = ["si", "sí", "s", "yes", "y", "claro", "ok", "okay", "dale", "va"];
@@ -53,6 +59,59 @@ function yesNo(question: string): OutboundMessage {
     };
   }
   return text(`${question}\n\nResponde *sí* o *no*.`);
+}
+
+function statusVerb(s: "OPEN" | "CLOSED"): string {
+  return s === "OPEN" ? "abierto" : "cerrado";
+}
+
+function truncateTitle(name: string): string {
+  return name.length > 20 ? `${name.slice(0, 19)}…` : name;
+}
+
+function pickCompanyFallbackText(
+  companies: { name: string }[],
+  status: "OPEN" | "CLOSED"
+): string {
+  const list = companies.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
+  return `¿Qué negocio quieres marcar como *${statusVerb(status)}*? Responde con el *número*:\n\n${list}`;
+}
+
+export function pickCompanyMessage(
+  companies: { id: string; name: string }[],
+  status: "OPEN" | "CLOSED"
+): OutboundMessage {
+  const question = `¿Qué negocio quieres marcar como *${statusVerb(status)}*?`;
+  const fallbackText = pickCompanyFallbackText(companies, status);
+
+  if (companies.length === 2 && env.TWILIO_CONTENT_SID_PICK_COMPANY_2) {
+    return {
+      kind: "buttons",
+      contentSid: env.TWILIO_CONTENT_SID_PICK_COMPANY_2,
+      variables: {
+        "1": question,
+        "2": truncateTitle(companies[0].name),
+        "3": truncateTitle(companies[1].name),
+      },
+      fallbackText,
+    };
+  }
+
+  if (companies.length === 3 && env.TWILIO_CONTENT_SID_PICK_COMPANY_3) {
+    return {
+      kind: "buttons",
+      contentSid: env.TWILIO_CONTENT_SID_PICK_COMPANY_3,
+      variables: {
+        "1": question,
+        "2": truncateTitle(companies[0].name),
+        "3": truncateTitle(companies[1].name),
+        "4": truncateTitle(companies[2].name),
+      },
+      fallbackText,
+    };
+  }
+
+  return { kind: "text", body: fallbackText };
 }
 
 function yesNoOther(question: string): OutboundMessage {
@@ -103,6 +162,78 @@ const COPY = {
   flow_error: "Algo se enredó 😅. Empecemos de nuevo: escríbeme *hola*.",
 };
 
+function missingFields(data: FlowData): (keyof ExtractedFields)[] {
+  const m: (keyof ExtractedFields)[] = [];
+  if (!data.display_name) m.push("display_name");
+  if (!data.business_name) m.push("business_name");
+  if (!data.industry_id) m.push("industry_hint");
+  if (data.location_text == null) m.push("location_text");
+  if (data.business_phone == null) m.push("business_phone");
+  return m;
+}
+
+async function applyExtracted(
+  data: FlowData,
+  extracted: ExtractedFields
+): Promise<FlowData> {
+  if (extracted.display_name && !data.display_name) {
+    data.display_name = extracted.display_name;
+  }
+  if (extracted.business_name && !data.business_name) {
+    data.business_name = extracted.business_name;
+  }
+  if (extracted.location_text && data.location_text == null) {
+    data.location_text = extracted.location_text;
+  }
+  if (extracted.business_phone && data.business_phone == null) {
+    // Validar formato mínimo antes de aceptar
+    const phone = extracted.business_phone.replace(/\s+/g, "");
+    if (/^\+?\d{6,}$/.test(phone)) {
+      data.business_phone = phone.startsWith("+") ? phone : `+${phone}`;
+    }
+  }
+  if (extracted.industry_hint && !data.industry_id) {
+    const inferred = await industriesService.inferFromText(extracted.industry_hint);
+    if (inferred) {
+      data.industry_id = inferred.industry.id;
+      data.industry_name = inferred.industry.name;
+    }
+  }
+  return data;
+}
+
+function nextStepFor(data: FlowData): Step {
+  if (!data.display_name) return "ask_name";
+  if (!data.business_name) return "ask_business";
+  if (!data.industry_id) return "ask_category";
+  if (data.location_text === undefined) return "ask_location";
+  if (data.business_phone === undefined) return "ask_business_phone";
+  return "confirm";
+}
+
+function promptFor(step: Step, data: FlowData, waFrom: string): OutboundMessage {
+  switch (step) {
+    case "ask_name":
+      return text("¿Cómo te llamas?");
+    case "ask_business":
+      return text(COPY.ask_business);
+    case "ask_category":
+      return text(COPY.ask_category);
+    case "ask_location":
+      return text(COPY.ask_location);
+    case "ask_business_phone": {
+      const myPhone = phoneFromWaFrom(waFrom);
+      return yesNoOther(
+        `El número desde el que escribes es *${myPhone}*. ¿Es también el número de contacto de tu negocio?`
+      );
+    }
+    case "confirm":
+      return yesNo(summaryText(data));
+    default:
+      return text(COPY.flow_error);
+  }
+}
+
 export const registrationFlow = {
   /**
    * Procesa un paso del flujo. Persiste la sesión. Devuelve el OutboundMessage a enviar.
@@ -128,17 +259,30 @@ export const registrationFlow = {
     switch (step) {
       case "pick_company_status": {
         const status = data.status ?? "OPEN";
-        const verb = status === "OPEN" ? "abierto" : "cerrado";
-        const companies = await companiesService.listForContact(contact.id);
+        const verb = statusVerb(status);
+        const ids = data.company_ids ?? [];
         const n = parseInt(raw, 10);
-        if (Number.isNaN(n) || n < 1 || n > companies.length) {
-          const list = companies.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
-          return text(
-            `Necesito el número del negocio. Intenta de nuevo:\n\n${list}`
-          );
+
+        if (!ids.length || Number.isNaN(n) || n < 1 || n > ids.length) {
+          const companies = await companiesService.listForContact(contact.id);
+          await sessionsService.set(waFrom, "pick_company_status", {
+            status,
+            company_ids: companies.map((c) => c.id),
+          });
+          return pickCompanyMessage(companies, status);
         }
-        const chosen = companies[n - 1];
-        await companiesService.setStatus(chosen.id, status);
+
+        const chosenId = ids[n - 1];
+        const companies = await companiesService.listForContact(contact.id);
+        const chosen = companies.find((c) => c.id === chosenId);
+        if (!chosen) {
+          await sessionsService.set(waFrom, "pick_company_status", {
+            status,
+            company_ids: companies.map((c) => c.id),
+          });
+          return pickCompanyMessage(companies, status);
+        }
+        await companiesService.setStatus(chosenId, status);
         await sessionsService.reset(waFrom);
         return text(`✅ *${chosen.name}* quedó marcado como *${verb}*.`);
       }
@@ -159,24 +303,74 @@ export const registrationFlow = {
 
       case "ask_name": {
         if (!raw) return text("Necesito tu nombre para continuar 🙂. ¿Cómo te llamas?");
-        const clean = await normalizeAnswer("person_name", raw);
-        data.display_name = clean;
-        await contactsService.updateName(waFrom, clean);
-        await sessionsService.set(waFrom, "ask_business", data);
 
-        const intro = await personalizeIntro("post_ask_name", { display_name: clean });
-        return text(joinIntro(intro || `¡Mucho gusto, *${clean}*! 👋`, COPY.ask_business));
+        const extracted = await extractRegistrationFields(raw, missingFields(data));
+        await applyExtracted(data, extracted);
+
+        // Si el extractor llenó display_name, ya no procesamos `raw` como nombre completo.
+        // Si NO, caemos al modo clásico: tratar todo el texto como el nombre.
+        if (!data.display_name) {
+          data.display_name = await normalizeAnswer("person_name", raw);
+        } else {
+          data.display_name = await normalizeAnswer("person_name", data.display_name);
+        }
+        if (data.business_name) {
+          data.business_name = await normalizeAnswer("business_name", data.business_name);
+        }
+        if (data.location_text) {
+          data.location_text = await normalizeAnswer("location", data.location_text);
+        }
+
+        await contactsService.updateName(waFrom, data.display_name);
+
+        const next = nextStepFor(data);
+        await sessionsService.set(waFrom, next, data);
+
+        const intro = await personalizeIntro("post_ask_name", { display_name: data.display_name });
+        const greeting = intro || `¡Mucho gusto, *${data.display_name}*! 👋`;
+        const prompt = promptFor(next, data, waFrom);
+        if (prompt.kind === "text") {
+          return text(joinIntro(greeting, prompt.body));
+        }
+        return prompt;
       }
 
       case "ask_business": {
         if (!raw) return text(COPY.ask_business);
-        const clean = await normalizeAnswer("business_name", raw);
-        data.business_name = clean;
-        await sessionsService.set(waFrom, "ask_category", data);
-        return text(COPY.ask_category);
+
+        const extracted = await extractRegistrationFields(raw, missingFields(data));
+        await applyExtracted(data, extracted);
+
+        if (!data.business_name) {
+          data.business_name = await normalizeAnswer("business_name", raw);
+        } else {
+          data.business_name = await normalizeAnswer("business_name", data.business_name);
+        }
+        if (data.location_text) {
+          data.location_text = await normalizeAnswer("location", data.location_text);
+        }
+
+        const next = nextStepFor(data);
+        await sessionsService.set(waFrom, next, data);
+        return promptFor(next, data, waFrom);
       }
 
       case "ask_category": {
+        const extracted = await extractRegistrationFields(raw, missingFields(data));
+        await applyExtracted(data, extracted);
+        if (data.location_text) {
+          data.location_text = await normalizeAnswer("location", data.location_text);
+        }
+
+        // Si el extractor ya resolvió la industria via industry_hint, confirmamos.
+        if (data.industry_id && data.industry_name) {
+          await sessionsService.set(waFrom, "confirm_category", data);
+          return yesNo(
+            `Detecté que tu negocio es de *${data.industry_name}*. ¿Es correcto?`
+          );
+        }
+
+        // Fallback clásico: inferir directo del raw.
         const inferred = await industriesService.inferFromText(raw);
         if (inferred) {
           data.industry_id = inferred.industry.id;
@@ -226,13 +420,17 @@ export const registrationFlow = {
         if (isSkip(lower) || !raw) {
           data.location_text = null;
         } else {
-          data.location_text = await normalizeAnswer("location", raw);
+          const extracted = await extractRegistrationFields(raw, missingFields(data));
+          await applyExtracted(data, extracted);
+          if (data.location_text) {
+            data.location_text = await normalizeAnswer("location", data.location_text);
+          } else {
+            data.location_text = await normalizeAnswer("location", raw);
+          }
         }
-        await sessionsService.set(waFrom, "ask_business_phone", data);
-        const myPhone = phoneFromWaFrom(waFrom);
-        return yesNoOther(
-          `El número desde el que escribes es *${myPhone}*. ¿Es también el número de contacto de tu negocio?`
-        );
+        const next = nextStepFor(data);
+        await sessionsService.set(waFrom, next, data);
+        return promptFor(next, data, waFrom);
       }
 
       case "ask_business_phone": {

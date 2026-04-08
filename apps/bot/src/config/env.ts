@@ -8,6 +8,8 @@ const schema = z.object({
   TWILIO_WHATSAPP_FROM: z.string().min(1),
   TWILIO_CONTENT_SID_YES_NO: z.string().optional(),
   TWILIO_CONTENT_SID_YES_NO_OTHER: z.string().optional(),
+  TWILIO_CONTENT_SID_PICK_COMPANY_2: z.string().optional(),
+  TWILIO_CONTENT_SID_PICK_COMPANY_3: z.string().optional(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   OPENAI_API_KEY: z.string().optional(),

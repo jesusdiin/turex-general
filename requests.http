@@ -135,3 +135,12 @@ Prefer: return=representation
   "company_id": "REEMPLAZAR_UUID_COMPANY",
   "tool_id": "REEMPLAZAR_UUID_TOOL"
 }
+
+
+# ============================================================
+# MOBILE (anon, directorio público de negocios abiertos)
+# ============================================================
+
+### Listar empresas abiertas con su rubro (sin Authorization)
+GET {{baseUrl}}/rest/v1/companies?select=id,name,location_text,business_phone,status,industry:industries(name,slug)&status=eq.OPEN
+apikey: {{anonKey}}

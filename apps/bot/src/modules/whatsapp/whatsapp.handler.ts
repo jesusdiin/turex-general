@@ -3,6 +3,7 @@ import { companiesService } from "../../services/companies.service";
 import { sessionsService } from "../../services/sessions.service";
 import { OutboundMessage } from "../../services/messages.service";
 import { registrationFlow, pickCompanyMessage } from "./registration.flow";
+import { productFlow } from "./product.flow";
 import { env } from "../../config/env";
 import { detectIntent } from "./intents";
 
@@ -95,8 +96,20 @@ export async function handleIncomingMessage({
       });
       return { kind: "text", body: ASK_BUSINESS_COPY };
     }
+    if (
+      intent?.name === "add_product" ||
+      intent?.name === "list_products" ||
+      intent?.name === "delete_product" ||
+      intent?.name === "edit_product"
+    ) {
+      return await productFlow.handleIntent(contact, intent, effectiveBody);
+    }
     await sessionsService.set(from, "menu_existing", {});
     return menuExistingMessage();
+  }
+
+  if (session?.step.startsWith("product_")) {
+    return await productFlow.step(contact, session, effectiveBody, media);
   }
 
   return await registrationFlow.step(contact, session, effectiveBody, media);

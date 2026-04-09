@@ -1,6 +1,10 @@
 import { closeBusinessIntent } from "./close-business.intent";
 import { openBusinessIntent } from "./open-business.intent";
 import { newBusinessIntent } from "./new-business.intent";
+import { addProductIntent } from "./add-product.intent";
+import { listProductsIntent } from "./list-products.intent";
+import { deleteProductIntent } from "./delete-product.intent";
+import { editProductIntent } from "./edit-product.intent";
 import { normalize } from "./normalize";
 import { IntentDetector, IntentMatch } from "./types";
 
@@ -8,6 +12,10 @@ const DETECTORS: IntentDetector[] = [
   closeBusinessIntent,
   openBusinessIntent,
   newBusinessIntent,
+  addProductIntent,
+  listProductsIntent,
+  deleteProductIntent,
+  editProductIntent,
 ];
 
 export function detectIntent(text: string): IntentMatch | null {

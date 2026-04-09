@@ -1,4 +1,34 @@
-# turex-general
+### 2. README para el Back-end (TypeScript/Supabase)
+**Repositorio:** `jesusdiin/turex-general`
+frontend: https://github.com/RonaldoAO/frontend_turex_negocio
+backend: https://github.com/jesusdiin/turex-general
+```markdown
+# TUREX - Backend: Inteligencia de Negocio y Gestión via WhatsApp
+
+
+## 📌 Visión General
+Este es el motor central de **TUREX**. Se encarga de la orquestación de datos, la lógica de gamificación y, lo más importante, la democratización tecnológica para el micro-negocio local mediante una interfaz invisible basada en **Inteligencia Artificial Conversacional**.
+
+## ⚙️ Funcionalidades Core
+* **Agente de IA (WhatsApp Business API):** Gestión total del negocio mediante lenguaje natural. El artesano o cocinera administra inventarios, disponibilidad y ventas enviando audios o mensajes de texto.
+* **Motor de Visibilidad Inteligente:** Algoritmo que balancea el flujo de turistas. Si un negocio alcanza su capacidad operativa, la IA redistribuye la visibilidad para proteger la calidad del servicio y la reputación del local.
+* **Gestión de Activos Digitales:** Lógica de validación para el sistema de recompensas y misiones del turista.
+* **Soberanía de Datos:** Registro preciso de la derrama económica local para generar métricas de impacto real.
+
+## 🛠️ Arquitectura Técnica
+* **Lenguaje:** TypeScript (Node.js)
+* **Base de Datos:** PostgreSQL (vía Supabase)
+* **Servicios Cloud:** Supabase (Auth, Edge Functions, Realtime)
+* **IA Engine:** Integración con LLMs (OpenAI/Anthropic) para el procesamiento de lenguaje natural en WhatsApp.
+
+## 📊 Estrategia de Retención (Oaxaca 2026)
+El backend está configurado para el puente logístico:
+* **19 Julio:** Final Mundial (Pico de demanda).
+* **20 Julio:** Inicio Guelaguetza (Activación TUREX).
+La infraestructura soporta la carga masiva de transacciones durante esta ventana de oro cultural.
+
+
+---
 
 Backend del ecosistema Turex usando **Supabase como BaaS** (Postgres + Auth + RLS). No hay capa de API propia: los clientes (web/mobile) hablan directamente con Supabase usando `@supabase/supabase-js`.
 

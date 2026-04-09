@@ -463,7 +463,7 @@ export const registrationFlow = {
 
       case "confirm": {
         if (isYes(lower)) {
-          await companiesService.createForContact(contact.id, {
+          const company = await companiesService.createForContact(contact.id, {
             name: data.business_name!,
             industryId: data.industry_id!,
             locationText: data.location_text ?? null,
@@ -471,7 +471,9 @@ export const registrationFlow = {
           });
           await sessionsService.reset(waFrom);
           return text(
-            `🎉 ¡Listo, *${data.business_name}* quedó registrado!\nSi quieres agregar otro negocio, escríbeme *nuevo negocio*.`
+            `🎉 ¡Listo, *${company.name}* quedó registrado!\n` +
+              `Tu folio es *${company.folio}* — guárdalo para futuras consultas.\n\n` +
+              `Si quieres agregar otro negocio, escríbeme *nuevo negocio*.`
           );
         }
         if (isNo(lower)) {

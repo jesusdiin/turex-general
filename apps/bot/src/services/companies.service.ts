@@ -4,6 +4,7 @@ export type CompanyStatus = "OPEN" | "CLOSED";
 
 export interface Company {
   id: string;
+  folio: string;
   name: string;
   industry_id: string;
   location_text: string | null;

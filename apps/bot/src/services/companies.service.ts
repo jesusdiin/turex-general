@@ -30,9 +30,9 @@ export const companiesService = {
       .eq("contact_id", contactId)
       .order("created_at", { ascending: true });
     if (error) throw error;
-    return ((data ?? [])
-      .map((r: { companies: Company | null }) => r.companies)
-      .filter(Boolean) as Company[]);
+    return ((data ?? []) as any[])
+      .map((r) => r.companies)
+      .filter(Boolean) as Company[];
   },
 
   async setStatus(companyId: string, status: CompanyStatus): Promise<void> {

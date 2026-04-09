@@ -9,13 +9,21 @@ export const whatsappController = {
     const body = String(req.body.Body ?? "");
     const buttonPayload = req.body.ButtonPayload ? String(req.body.ButtonPayload) : undefined;
 
+    const numMedia = parseInt(String(req.body.NumMedia ?? "0"), 10) || 0;
+    const media: { url: string; contentType: string }[] = [];
+    for (let i = 0; i < numMedia; i++) {
+      const url = req.body[`MediaUrl${i}`];
+      const ct = req.body[`MediaContentType${i}`];
+      if (url) media.push({ url: String(url), contentType: String(ct ?? "") });
+    }
+
     // Respondemos rápido al webhook; el envío saliente va por REST API
     res.status(200).end();
 
     if (!from) return;
 
     try {
-      const out = await handleIncomingMessage({ from, body, buttonPayload });
+      const out = await handleIncomingMessage({ from, body, buttonPayload, media });
       await messagesService.send(from, out);
     } catch (err) {
       console.error("[whatsapp.webhook] error:", err);

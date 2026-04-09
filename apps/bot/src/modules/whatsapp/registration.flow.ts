@@ -9,6 +9,7 @@ import {
   ExtractedFields,
 } from "../../services/llm.service";
 import { OutboundMessage } from "../../services/messages.service";
+import { photosService } from "../../services/photos.service";
 import { env } from "../../config/env";
 
 type Step =
@@ -22,7 +23,8 @@ type Step =
   | "ask_location"
   | "ask_business_phone"
   | "ask_business_phone_value"
-  | "confirm";
+  | "confirm"
+  | "ask_photos";
 
 interface FlowData {
   display_name?: string;
@@ -33,6 +35,8 @@ interface FlowData {
   business_phone?: string | null;
   status?: "OPEN" | "CLOSED";
   company_ids?: string[];
+  pending_company_id?: string;
+  photo_count?: number;
 }
 
 const YES = ["si", "sí", "s", "yes", "y", "claro", "ok", "okay", "dale", "va"];
@@ -241,7 +245,8 @@ export const registrationFlow = {
   async step(
     contact: WaContact,
     session: WaSession | null,
-    body: string
+    body: string,
+    media?: { url: string; contentType: string }[]
   ): Promise<OutboundMessage> {
     const raw = (body ?? "").trim();
     const lower = raw.toLowerCase();
@@ -469,11 +474,16 @@ export const registrationFlow = {
             locationText: data.location_text ?? null,
             businessPhone: data.business_phone ?? null,
           });
-          await sessionsService.reset(waFrom);
+          await sessionsService.set(waFrom, "ask_photos", {
+            ...data,
+            pending_company_id: company.id,
+            photo_count: 0,
+          });
           return text(
             `🎉 ¡Listo, *${company.name}* quedó registrado!\n` +
               `Tu folio es *${company.folio}* — guárdalo para futuras consultas.\n\n` +
-              `Si quieres agregar otro negocio, escríbeme *nuevo negocio*.`
+              `📸 ¿Quieres agregar fotos del negocio? Mándame hasta *${photosService.MAX_PHOTOS} imágenes* (jpg/png/webp).\n` +
+              `Cuando termines escribe *listo*. Si no quieres agregar fotos, escribe *omitir*.`
           );
         }
         if (isNo(lower)) {
@@ -481,6 +491,82 @@ export const registrationFlow = {
           return text(COPY.cancel_done);
         }
         return yesNo("¿Confirmo el registro con estos datos?");
+      }
+
+      case "ask_photos": {
+        const companyId = data.pending_company_id;
+        if (!companyId) {
+          await sessionsService.reset(waFrom);
+          return text(COPY.flow_error);
+        }
+
+        if (lower === "listo" || lower === "omitir" || isSkip(lower)) {
+          const count = data.photo_count ?? 0;
+          await sessionsService.reset(waFrom);
+          const tail = count > 0
+            ? `Guardé *${count}* foto(s). 👌`
+            : "Sin fotos por ahora — puedes agregarlas más tarde.";
+          return text(
+            `${tail}\n\nSi quieres agregar otro negocio, escríbeme *nuevo negocio*.`
+          );
+        }
+
+        const incoming = (media ?? []).filter((m) =>
+          m.contentType.startsWith("image/")
+        );
+        if (!incoming.length) {
+          return text(
+            `📸 Mándame imágenes del negocio (jpg/png/webp) o escribe *listo* / *omitir* para terminar.`
+          );
+        }
+
+        const already = data.photo_count ?? 0;
+        const slotsLeft = Math.max(0, photosService.MAX_PHOTOS - already);
+        if (slotsLeft === 0) {
+          await sessionsService.reset(waFrom);
+          return text(
+            `Ya tenías ${photosService.MAX_PHOTOS} fotos, ese es el máximo. Listo ✅`
+          );
+        }
+
+        const toUpload = incoming.slice(0, slotsLeft);
+        const uploaded: string[] = [];
+        for (let i = 0; i < toUpload.length; i++) {
+          try {
+            const url = await photosService.uploadFromTwilio(
+              companyId,
+              toUpload[i].url,
+              toUpload[i].contentType,
+              already + i
+            );
+            uploaded.push(url);
+          } catch (err) {
+            console.error("[ask_photos] upload failed:", (err as Error).message);
+          }
+        }
+
+        if (uploaded.length) {
+          try {
+            await photosService.appendToCompany(companyId, uploaded);
+          } catch (err) {
+            console.error("[ask_photos] append failed:", (err as Error).message);
+          }
+        }
+
+        const newCount = already + uploaded.length;
+        data.photo_count = newCount;
+        await sessionsService.set(waFrom, "ask_photos", data);
+
+        if (newCount >= photosService.MAX_PHOTOS) {
+          await sessionsService.reset(waFrom);
+          return text(
+            `Recibí ${uploaded.length} foto(s). Llegaste al máximo de ${photosService.MAX_PHOTOS} ✅`
+          );
+        }
+        return text(
+          `Recibí ${uploaded.length} foto(s) ✅. Llevas *${newCount}/${photosService.MAX_PHOTOS}*. ` +
+            `Manda más o escribe *listo* para terminar.`
+        );
       }
 
       default: {

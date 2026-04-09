@@ -29,6 +29,7 @@ export interface IncomingMessage {
   from: string;
   body: string;
   buttonPayload?: string;
+  media?: { url: string; contentType: string }[];
 }
 
 const PAYLOAD_TO_TEXT: Record<string, string> = {
@@ -44,6 +45,7 @@ export async function handleIncomingMessage({
   from,
   body,
   buttonPayload,
+  media,
 }: IncomingMessage): Promise<OutboundMessage> {
   // Si vino un payload de botón, lo usamos como body normalizado
   const effectiveBody = buttonPayload
@@ -97,5 +99,5 @@ export async function handleIncomingMessage({
     return menuExistingMessage();
   }
 
-  return await registrationFlow.step(contact, session, effectiveBody);
+  return await registrationFlow.step(contact, session, effectiveBody, media);
 }

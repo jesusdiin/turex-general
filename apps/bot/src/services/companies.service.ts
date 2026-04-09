@@ -10,6 +10,7 @@ export interface Company {
   location_text: string | null;
   business_phone: string | null;
   status: CompanyStatus;
+  photo_urls: string[];
 }
 
 export const companiesService = {

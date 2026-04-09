@@ -20,13 +20,47 @@ const KEYWORDS: Record<string, string[]> = {
     "cabana", "motel", "airbnb", "hospedar",
   ],
   restaurant: [
-    "taco", "tacos", "taqueria", "restaurante", "restauran",
-    "comida", "comidas", "bar", "cafe", "cafeteria",
-    "pizza", "pizzeria", "parrilla", "puesto", "cocina",
-    "quesadilla", "burrito", "tortas", "torta", "hamburguesa",
-    "hamburguesas", "sushi", "panaderia", "pasteleria",
-    "dulceria", "antojitos", "loncheria", "marisqueria",
-    "mariscos", "pollo", "pollos", "asados", "fonda",
+    "restaurante", "restauran", "cafe", "cafeteria", "bar",
+    "pizza", "pizzeria", "parrilla", "cocina", "sushi",
+    "panaderia", "pasteleria", "dulceria", "marisqueria",
+    "comida", "comidas", "taco", "tacos", "taqueria",
+    "quesadilla", "burrito", "tortas", "torta",
+    "hamburguesa", "hamburguesas", "mariscos",
+    "pollo", "pollos", "asados",
+  ],
+  street_food: [
+    "fonda", "fondas", "puesto", "puestos", "antojitos",
+    "loncheria", "loncherias", "garnachas", "tianguis",
+    "kiosko", "ambulante",
+  ],
+  artesanias: [
+    "artesania", "artesanias", "artesano", "artesana",
+    "manualidades", "bordado", "tejido", "talavera",
+    "barro", "ceramica", "hilo", "telar", "rebozo",
+  ],
+  abarrotes: [
+    "abarrotes", "abarrote", "tiendita",
+    "miscelanea", "miscelaneas", "deposito", "ultramarinos",
+  ],
+  belleza: [
+    "estetica", "esteticas", "salon", "barberia", "barber",
+    "peluqueria", "estilista", "unas", "spa",
+    "manicure", "pedicure", "maquillaje",
+  ],
+  taller: [
+    "taller", "talleres", "mecanico", "mecanica",
+    "refaccion", "refacciones", "electronica", "reparacion",
+    "reparaciones", "vulcanizadora", "hojalateria", "pintura",
+    "soldadura",
+  ],
+  ropa: [
+    "ropa", "boutique", "vestido", "vestidos", "calzado",
+    "zapato", "zapatos", "tenis", "moda", "accesorios",
+    "playera", "playeras",
+  ],
+  lavanderia: [
+    "lavanderia", "lavanderias", "tintoreria", "tintorerias",
+    "lavado", "planchado",
   ],
 };
 

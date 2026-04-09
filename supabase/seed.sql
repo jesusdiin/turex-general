@@ -8,7 +8,8 @@ insert into public.industries (slug, name, description) values
   ('belleza',     'Belleza',                 'Estéticas, barberías y salones'),
   ('taller',      'Talleres y reparaciones', 'Mecánicos, electrónica y reparaciones'),
   ('ropa',        'Ropa y calzado',          'Tiendas de ropa, calzado y accesorios'),
-  ('lavanderia',  'Lavandería',              'Lavanderías y tintorerías')
+  ('lavanderia',  'Lavandería',              'Lavanderías y tintorerías'),
+  ('talent_land',  'Talent Land',              'Talend Land')
 on conflict (slug) do nothing;
 
 insert into public.tools (slug, name, description, industry_id)
@@ -55,3 +56,9 @@ insert into public.tools (slug, name, description, industry_id)
 select 'laundry-tickets', 'Tickets de lavado', 'Seguimiento de prendas por cliente', id
 from public.industries where slug = 'lavanderia'
 on conflict (slug) do nothing;
+
+insert into public.tools (slug, name, description, industry_id)
+select 'talent-land-stands', 'Listados de stands', 'Gestión de stands para talentos', id
+from public.industries where slug = 'talent_land'
+on conflict (slug) do nothing;
+

@@ -13,7 +13,6 @@ import { photosService } from "../../services/photos.service";
 import { env } from "../../config/env";
 
 type Step =
-  | "menu_existing"
   | "pick_company_status"
   | "ask_name"
   | "ask_business"
@@ -290,20 +289,6 @@ export const registrationFlow = {
         await companiesService.setStatus(chosenId, status);
         await sessionsService.reset(waFrom);
         return text(`✅ *${chosen.name}* quedó marcado como *${verb}*.`);
-      }
-
-      case "menu_existing": {
-        if (isYes(lower)) {
-          await sessionsService.set(waFrom, "ask_business", {
-            display_name: contact.display_name ?? undefined,
-          });
-          return text(COPY.ask_business);
-        }
-        if (isNo(lower)) {
-          await sessionsService.reset(waFrom);
-          return text("Ok, aquí estaré cuando quieras 👋");
-        }
-        return yesNo("¿Quieres registrar *otro negocio*?");
       }
 
       case "ask_name": {

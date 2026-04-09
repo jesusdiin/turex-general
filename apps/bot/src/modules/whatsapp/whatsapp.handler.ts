@@ -1,5 +1,5 @@
 import { contactsService, phoneFromWaFrom } from "../../services/contacts.service";
-import { companiesService } from "../../services/companies.service";
+import { companiesService, Company } from "../../services/companies.service";
 import { sessionsService } from "../../services/sessions.service";
 import { OutboundMessage } from "../../services/messages.service";
 import { registrationFlow, pickCompanyMessage } from "./registration.flow";
@@ -7,23 +7,30 @@ import { productFlow } from "./product.flow";
 import { env } from "../../config/env";
 import { detectIntent } from "./intents";
 
-const ASK_BUSINESS_COPY = "Ahora dime, ¿cuál es el *nombre de tu negocio*?";
-
 function statusVerb(s: "OPEN" | "CLOSED"): string {
   return s === "OPEN" ? "abierto" : "cerrado";
 }
 
-function menuExistingMessage(): OutboundMessage {
-  const question = "Ya tienes negocios registrados 👋. ¿Quieres registrar *otro negocio*?";
-  if (env.TWILIO_CONTENT_SID_YES_NO) {
-    return {
-      kind: "buttons",
-      contentSid: env.TWILIO_CONTENT_SID_YES_NO,
-      variables: { "1": question },
-      fallbackText: `${question}\n\nResponde *sí* o *no*.`,
-    };
-  }
-  return { kind: "text", body: `${question}\n\nResponde *sí* o *no*.` };
+function businessMenuMessage(companies: Company[]): OutboundMessage {
+  const list = companies
+    .map((c, i) => {
+      const icon = c.status === "OPEN" ? "✅" : "❌";
+      const label = c.status === "OPEN" ? "Abierto" : "Cerrado";
+      return `${i + 1}. ${c.name} — ${icon} ${label}`;
+    })
+    .join("\n");
+
+  const body = [
+    "👋 Tus negocios:\n",
+    list,
+    "\n¿Qué quieres hacer?",
+    "• *abrir* / *cerrar* — cambiar estado",
+    "• *agregar producto* — añadir al menú",
+    "• *ver menú* — ver tus productos",
+    "• *nuevo negocio* — registrar otro",
+  ].join("\n");
+
+  return { kind: "text", body };
 }
 
 export interface IncomingMessage {
@@ -94,7 +101,7 @@ export async function handleIncomingMessage({
       await sessionsService.set(from, "ask_business", {
         display_name: contact.display_name ?? undefined,
       });
-      return { kind: "text", body: ASK_BUSINESS_COPY };
+      return { kind: "text", body: "Ahora dime, ¿cuál es el *nombre de tu negocio*?" };
     }
     if (
       intent?.name === "add_product" ||
@@ -104,8 +111,8 @@ export async function handleIncomingMessage({
     ) {
       return await productFlow.handleIntent(contact, intent, effectiveBody);
     }
-    await sessionsService.set(from, "menu_existing", {});
-    return menuExistingMessage();
+    const companies = await companiesService.listForContact(contact.id);
+    return businessMenuMessage(companies);
   }
 
   if (session?.step.startsWith("product_")) {

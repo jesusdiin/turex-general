@@ -204,6 +204,11 @@ export async function handleIncomingMessage({
     return productFlow.handleIntent(contact, intent, effectiveBody);
   }
 
+  // Usuario nuevo (sin negocios): iniciar registro automáticamente
+  if (!companies.length) {
+    return startRegistration(contact);
+  }
+
   // Fallback: mostrar menú principal
   return mainMenuMessage(contact.display_name, companies);
 }

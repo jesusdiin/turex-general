@@ -241,9 +241,13 @@ function promptFor(step: Step, data: FlowData, waFrom: string): OutboundMessage 
 export async function startRegistration(
   contact: WaContact
 ): Promise<OutboundMessage> {
-  await sessionsService.set(contact.whatsapp_from, "ask_name", {
-    display_name: contact.display_name ?? undefined,
-  });
+  if (contact.display_name) {
+    await sessionsService.set(contact.whatsapp_from, "ask_business", {
+      display_name: contact.display_name,
+    });
+    return text(COPY.ask_business);
+  }
+  await sessionsService.set(contact.whatsapp_from, "ask_name", {});
   return text(COPY.start);
 }
 

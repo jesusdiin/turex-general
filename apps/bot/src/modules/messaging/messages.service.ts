@@ -1,5 +1,5 @@
-import { twilioClient } from "./twilio";
-import { env } from "../config/env";
+import { twilioClient } from "../../lib/twilio";
+import { env } from "../../config/env";
 
 export type OutboundMessage =
   | { kind: "text"; body: string }

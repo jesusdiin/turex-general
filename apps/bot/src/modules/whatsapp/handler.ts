@@ -1,16 +1,16 @@
-import { contactsService, phoneFromWaFrom } from "../../services/contacts.service";
-import { companiesService } from "../../services/companies.service";
-import { productsService } from "../../services/products.service";
-import { sessionsService } from "../../services/sessions.service";
-import { OutboundMessage } from "../../services/messages.service";
-import { registrationFlow, startRegistration } from "./registration.flow";
-import { productFlow, formatMenu } from "./product.flow";
-import { businessEditFlow } from "./business-edit.flow";
+import { contactsService, phoneFromWaFrom } from "../contacts/contacts.service";
+import { companiesService } from "../companies/companies.service";
+import { productsService } from "../products/products.service";
+import { sessionsService } from "../contacts/sessions.service";
+import { OutboundMessage } from "../messaging/messages.service";
+import { registrationFlow, startRegistration } from "./flows/registration.flow";
+import { productFlow, formatMenu } from "./flows/product.flow";
+import { businessEditFlow } from "./flows/business-edit.flow";
 import {
   mainMenuMessage,
   businessSubMenuMessage,
   completedWithSubMenu,
-} from "./navigation";
+} from "./flows/navigation";
 import { detectIntent } from "./intents";
 
 export interface IncomingMessage {
@@ -182,7 +182,7 @@ export async function handleIncomingMessage({
       }
     }
     if (companies.length > 1) {
-      const { pickCompanyMessage } = await import("./registration.flow");
+      const { pickCompanyMessage } = await import("./flows/registration.flow");
       await sessionsService.set(from, "pick_company_status", {
         status,
         company_ids: companies.map((c) => c.id),

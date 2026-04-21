@@ -1,7 +1,8 @@
-import { supabase } from "./supabase";
-import { env } from "../config/env";
+import { supabase } from "../../lib/supabase";
+import { env } from "../../config/env";
 
-const BUCKET = "product-photos";
+const BUCKET = "company-photos";
+const MAX_PHOTOS = 5;
 
 function extFor(contentType: string): string {
   if (contentType === "image/png") return "png";
@@ -9,12 +10,14 @@ function extFor(contentType: string): string {
   return "jpg";
 }
 
-export const productPhotosService = {
+export const photosService = {
+  MAX_PHOTOS,
+
   async uploadFromTwilio(
     companyId: string,
-    productId: string,
     twilioMediaUrl: string,
-    contentType: string
+    contentType: string,
+    index: number
   ): Promise<string> {
     const auth = Buffer.from(
       `${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`
@@ -28,7 +31,7 @@ export const productPhotosService = {
     }
     const buffer = Buffer.from(await res.arrayBuffer());
 
-    const path = `${companyId}/${productId}/${Date.now()}.${extFor(contentType)}`;
+    const path = `${companyId}/${Date.now()}_${index}.${extFor(contentType)}`;
 
     const { error } = await supabase.storage
       .from(BUCKET)
@@ -37,5 +40,24 @@ export const productPhotosService = {
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
+  },
+
+  async appendToCompany(companyId: string, urls: string[]): Promise<void> {
+    if (!urls.length) return;
+    const { data, error } = await supabase
+      .from("companies")
+      .select("photo_urls")
+      .eq("id", companyId)
+      .single();
+    if (error) throw error;
+
+    const current: string[] = data?.photo_urls ?? [];
+    const merged = [...current, ...urls].slice(0, MAX_PHOTOS);
+
+    const { error: upErr } = await supabase
+      .from("companies")
+      .update({ photo_urls: merged })
+      .eq("id", companyId);
+    if (upErr) throw upErr;
   },
 };

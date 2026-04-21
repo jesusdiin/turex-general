@@ -1,12 +1,11 @@
-import { WaContact } from "../../services/contacts.service";
-import { companiesService, Company } from "../../services/companies.service";
-import { industriesService } from "../../services/industries.service";
-import { sessionsService, WaSession } from "../../services/sessions.service";
-import { normalizeAnswer } from "../../services/llm.service";
-import { photosService } from "../../services/photos.service";
-import { OutboundMessage } from "../../services/messages.service";
+import { WaContact, phoneFromWaFrom } from "../../contacts/contacts.service";
+import { companiesService, Company } from "../../companies/companies.service";
+import { industriesService } from "../../industries/industries.service";
+import { sessionsService, WaSession } from "../../contacts/sessions.service";
+import { normalizeAnswer } from "../../../lib/llm";
+import { photosService } from "../../companies/photos.service";
+import { OutboundMessage } from "../../messaging/messages.service";
 import { businessSubMenuMessage, completedWithSubMenu, mainMenuMessage } from "./navigation";
-import { phoneFromWaFrom } from "../../services/contacts.service";
 
 const text = (body: string): OutboundMessage => ({ kind: "text", body });
 

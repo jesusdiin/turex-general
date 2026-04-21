@@ -1,12 +1,12 @@
-import { WaContact } from "../../services/contacts.service";
-import { companiesService, Company } from "../../services/companies.service";
-import { productsService, Product } from "../../services/products.service";
-import { productPhotosService } from "../../services/product-photos.service";
-import { sessionsService, WaSession } from "../../services/sessions.service";
-import { extractProductFields, ExtractedProductFields } from "../../services/llm.service";
-import { OutboundMessage } from "../../services/messages.service";
-import { env } from "../../config/env";
-import { IntentMatch } from "./intents";
+import { WaContact } from "../../contacts/contacts.service";
+import { companiesService, Company } from "../../companies/companies.service";
+import { productsService, Product } from "../../products/products.service";
+import { productPhotosService } from "../../products/product-photos.service";
+import { sessionsService, WaSession } from "../../contacts/sessions.service";
+import { extractProductFields, ExtractedProductFields } from "../../../lib/llm";
+import { OutboundMessage } from "../../messaging/messages.service";
+import { env } from "../../../config/env";
+import { IntentMatch } from "../intents";
 import { businessSubMenuMessage, completedWithSubMenu } from "./navigation";
 
 /* ── helpers ─────────────────────────────────────────────────── */

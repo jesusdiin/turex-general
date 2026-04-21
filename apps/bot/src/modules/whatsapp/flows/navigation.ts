@@ -1,5 +1,5 @@
-import { Company } from "../../services/companies.service";
-import { OutboundMessage } from "../../services/messages.service";
+import { Company } from "../../companies/companies.service";
+import { OutboundMessage } from "../../messaging/messages.service";
 
 const text = (body: string): OutboundMessage => ({ kind: "text", body });
 

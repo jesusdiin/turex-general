@@ -1,16 +1,16 @@
-import { contactsService, WaContact, phoneFromWaFrom } from "../../services/contacts.service";
-import { industriesService, Industry } from "../../services/industries.service";
-import { companiesService } from "../../services/companies.service";
-import { sessionsService, WaSession } from "../../services/sessions.service";
+import { contactsService, WaContact, phoneFromWaFrom } from "../../contacts/contacts.service";
+import { industriesService, Industry } from "../../industries/industries.service";
+import { companiesService } from "../../companies/companies.service";
+import { sessionsService, WaSession } from "../../contacts/sessions.service";
 import {
   normalizeAnswer,
   personalizeIntro,
   extractRegistrationFields,
   ExtractedFields,
-} from "../../services/llm.service";
-import { OutboundMessage } from "../../services/messages.service";
-import { photosService } from "../../services/photos.service";
-import { env } from "../../config/env";
+} from "../../../lib/llm";
+import { OutboundMessage } from "../../messaging/messages.service";
+import { photosService } from "../../companies/photos.service";
+import { env } from "../../../config/env";
 import { businessSubMenuMessage, completedWithSubMenu, mainMenuMessage } from "./navigation";
 
 type Step =

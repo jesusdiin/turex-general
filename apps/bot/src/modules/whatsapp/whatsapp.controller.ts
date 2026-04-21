@@ -1,6 +1,6 @@
 import { RequestHandler } from "express";
-import { handleIncomingMessage } from "./whatsapp.handler";
-import { messagesService } from "../../services/messages.service";
+import { handleIncomingMessage } from "./handler";
+import { messagesService } from "../messaging/messages.service";
 
 export const whatsappController = {
   // TODO: validar firma de Twilio con twilio.validateRequest(authToken, signature, url, params)

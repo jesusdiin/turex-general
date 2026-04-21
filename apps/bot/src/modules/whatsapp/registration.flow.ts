@@ -11,6 +11,7 @@ import {
 import { OutboundMessage } from "../../services/messages.service";
 import { photosService } from "../../services/photos.service";
 import { env } from "../../config/env";
+import { businessSubMenuMessage, completedWithSubMenu, mainMenuMessage } from "./navigation";
 
 type Step =
   | "pick_company_status"
@@ -237,6 +238,15 @@ function promptFor(step: Step, data: FlowData, waFrom: string): OutboundMessage 
   }
 }
 
+export async function startRegistration(
+  contact: WaContact
+): Promise<OutboundMessage> {
+  await sessionsService.set(contact.whatsapp_from, "ask_name", {
+    display_name: contact.display_name ?? undefined,
+  });
+  return text(COPY.start);
+}
+
 export const registrationFlow = {
   /**
    * Procesa un paso del flujo. Persiste la sesión. Devuelve el OutboundMessage a enviar.
@@ -287,6 +297,14 @@ export const registrationFlow = {
           return pickCompanyMessage(companies, status);
         }
         await companiesService.setStatus(chosenId, status);
+        const freshCompany = await companiesService.getById(chosenId);
+        if (freshCompany) {
+          await sessionsService.set(waFrom, "business_submenu", {
+            company_id: freshCompany.id,
+            company_name: freshCompany.name,
+          });
+          return completedWithSubMenu(`✅ *${chosen.name}* quedó marcado como *${verb}*.`, freshCompany);
+        }
         await sessionsService.reset(waFrom);
         return text(`✅ *${chosen.name}* quedó marcado como *${verb}*.`);
       }
@@ -473,7 +491,9 @@ export const registrationFlow = {
         }
         if (isNo(lower)) {
           await sessionsService.reset(waFrom);
-          return text(COPY.cancel_done);
+          const companies = await companiesService.listForContact(contact.id);
+          const menuMsg = mainMenuMessage(contact.display_name, companies);
+          return { kind: "text", body: `Registro cancelado.\n\n${(menuMsg as any).body}` };
         }
         return yesNo("¿Confirmo el registro con estos datos?");
       }
@@ -487,13 +507,19 @@ export const registrationFlow = {
 
         if (lower === "listo" || lower === "omitir" || isSkip(lower)) {
           const count = data.photo_count ?? 0;
-          await sessionsService.reset(waFrom);
           const tail = count > 0
             ? `Guardé *${count}* foto(s). 👌`
             : "Sin fotos por ahora — puedes agregarlas más tarde.";
-          return text(
-            `${tail}\n\nSi quieres agregar otro negocio, escríbeme *nuevo negocio*.`
-          );
+          const company = await companiesService.getById(data.pending_company_id!);
+          if (company) {
+            await sessionsService.set(waFrom, "business_submenu", {
+              company_id: company.id,
+              company_name: company.name,
+            });
+            return completedWithSubMenu(tail, company);
+          }
+          await sessionsService.reset(waFrom);
+          return text(tail);
         }
 
         const incoming = (media ?? []).filter((m) =>
@@ -508,10 +534,19 @@ export const registrationFlow = {
         const already = data.photo_count ?? 0;
         const slotsLeft = Math.max(0, photosService.MAX_PHOTOS - already);
         if (slotsLeft === 0) {
+          const company = await companiesService.getById(companyId!);
+          if (company) {
+            await sessionsService.set(waFrom, "business_submenu", {
+              company_id: company.id,
+              company_name: company.name,
+            });
+            return completedWithSubMenu(
+              `Ya tenías ${photosService.MAX_PHOTOS} fotos, ese es el máximo. Listo ✅`,
+              company
+            );
+          }
           await sessionsService.reset(waFrom);
-          return text(
-            `Ya tenías ${photosService.MAX_PHOTOS} fotos, ese es el máximo. Listo ✅`
-          );
+          return text(`Ya tenías ${photosService.MAX_PHOTOS} fotos, ese es el máximo. Listo ✅`);
         }
 
         const toUpload = incoming.slice(0, slotsLeft);
@@ -543,10 +578,19 @@ export const registrationFlow = {
         await sessionsService.set(waFrom, "ask_photos", data);
 
         if (newCount >= photosService.MAX_PHOTOS) {
+          const company = await companiesService.getById(companyId!);
+          if (company) {
+            await sessionsService.set(waFrom, "business_submenu", {
+              company_id: company.id,
+              company_name: company.name,
+            });
+            return completedWithSubMenu(
+              `Recibí ${uploaded.length} foto(s). Llegaste al máximo de ${photosService.MAX_PHOTOS} ✅`,
+              company
+            );
+          }
           await sessionsService.reset(waFrom);
-          return text(
-            `Recibí ${uploaded.length} foto(s). Llegaste al máximo de ${photosService.MAX_PHOTOS} ✅`
-          );
+          return text(`Recibí ${uploaded.length} foto(s). Llegaste al máximo de ${photosService.MAX_PHOTOS} ✅`);
         }
         return text(
           `Recibí ${uploaded.length} foto(s) ✅. Llevas *${newCount}/${photosService.MAX_PHOTOS}*. ` +

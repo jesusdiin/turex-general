@@ -5,7 +5,8 @@ export type IntentName =
   | "add_product"
   | "list_products"
   | "delete_product"
-  | "edit_product";
+  | "edit_product"
+  | "menu";
 
 export interface IntentMatch {
   name: IntentName;

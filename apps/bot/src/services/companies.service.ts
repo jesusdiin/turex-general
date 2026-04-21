@@ -71,4 +71,35 @@ export const companiesService = {
 
     return company as Company;
   },
+
+  async getById(companyId: string): Promise<Company | null> {
+    const { data, error } = await supabase
+      .from("companies")
+      .select("*")
+      .eq("id", companyId)
+      .single();
+    if (error) return null;
+    return data as Company;
+  },
+
+  async update(
+    companyId: string,
+    fields: Partial<Pick<Company, "name" | "industry_id" | "location_text" | "business_phone" | "photo_urls">>
+  ): Promise<Company> {
+    const { data, error } = await supabase
+      .from("companies")
+      .update(fields)
+      .eq("id", companyId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Company;
+  },
+
+  async delete(companyId: string): Promise<void> {
+    await supabase.from("products").delete().eq("company_id", companyId);
+    await supabase.from("company_contacts").delete().eq("company_id", companyId);
+    const { error } = await supabase.from("companies").delete().eq("id", companyId);
+    if (error) throw error;
+  },
 };

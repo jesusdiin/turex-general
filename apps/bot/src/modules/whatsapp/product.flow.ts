@@ -7,6 +7,7 @@ import { extractProductFields, ExtractedProductFields } from "../../services/llm
 import { OutboundMessage } from "../../services/messages.service";
 import { env } from "../../config/env";
 import { IntentMatch } from "./intents";
+import { businessSubMenuMessage, completedWithSubMenu } from "./navigation";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -59,7 +60,7 @@ interface ProductFlowData {
 
 /* ── format menu ─────────────────────────────────────────────── */
 
-function formatMenu(companyName: string, products: Product[]): string {
+export function formatMenu(companyName: string, products: Product[]): string {
   if (!products.length) {
     return `Aún no tienes productos en *${companyName}*. Escribe *agregar producto* para empezar.`;
   }
@@ -410,15 +411,23 @@ async function stepHandler(
         category: data.category ?? null,
         photoUrl: data.photo_url ?? null,
       });
+      const company = await companiesService.getById(data.company_id!);
+      if (company) {
+        await sessionsService.set(waFrom, "business_submenu", {
+          company_id: company.id,
+          company_name: company.name,
+        });
+        return completedWithSubMenu(
+          `✅ *${product.name}* agregado a *${data.company_name}* por ${formatPrice(product.price)}.`,
+          company
+        );
+      }
       await sessionsService.reset(waFrom);
-      return text(
-        `✅ *${product.name}* agregado a *${data.company_name}* por ${formatPrice(product.price)}.\n\n` +
-          "Escribe *agregar producto* para añadir otro o *ver menú* para ver tu lista."
-      );
+      return text(`✅ *${product.name}* agregado.`);
     }
     if (isNo(lower)) {
       await sessionsService.reset(waFrom);
-      return text("Cancelado. Escribe *agregar producto* cuando quieras intentar de nuevo.");
+      return text("Cancelado.");
     }
     return yesNo("¿Confirmas agregar este producto?");
   }
@@ -442,10 +451,26 @@ async function stepHandler(
   if (step === "product_confirm_delete") {
     if (isYes(lower)) {
       await productsService.remove(data.product_id!);
+      const company = await companiesService.getById(data.company_id!);
+      if (company) {
+        await sessionsService.set(waFrom, "business_submenu", {
+          company_id: company.id,
+          company_name: company.name,
+        });
+        return completedWithSubMenu(`🗑️ *${data.name}* eliminado.`, company);
+      }
       await sessionsService.reset(waFrom);
       return text(`🗑️ *${data.name}* eliminado.`);
     }
     if (isNo(lower)) {
+      const company = await companiesService.getById(data.company_id!);
+      if (company) {
+        await sessionsService.set(waFrom, "business_submenu", {
+          company_id: company.id,
+          company_name: company.name,
+        });
+        return businessSubMenuMessage(company);
+      }
       await sessionsService.reset(waFrom);
       return text("No se eliminó nada.");
     }
@@ -491,9 +516,17 @@ async function stepHandler(
       }
       const newAvail = !product.available;
       await productsService.update(data.product_id!, { available: newAvail });
-      await sessionsService.reset(waFrom);
       const label = newAvail ? "disponible ✅" : "no disponible ❌";
-      return text(`*${data.name}* ahora está marcado como *${label}*.`);
+      const company = await companiesService.getById(data.company_id!);
+      if (company) {
+        await sessionsService.set(waFrom, "business_submenu", {
+          company_id: company.id,
+          company_name: company.name,
+        });
+        return completedWithSubMenu(`*${data.name}* ahora está *${label}*.`, company);
+      }
+      await sessionsService.reset(waFrom);
+      return text(`*${data.name}* ahora está *${label}*.`);
     }
 
     data.edit_field = field;
@@ -518,40 +551,48 @@ async function stepHandler(
   if (step === "product_edit_value") {
     const field = data.edit_field!;
 
+    const finishEdit = async (msg: string): Promise<OutboundMessage> => {
+      const company = await companiesService.getById(data.company_id!);
+      if (company) {
+        await sessionsService.set(waFrom, "business_submenu", {
+          company_id: company.id,
+          company_name: company.name,
+        });
+        return completedWithSubMenu(msg, company);
+      }
+      await sessionsService.reset(waFrom);
+      return text(msg);
+    };
+
     if (field === "name") {
       if (!raw) return text("Necesito el nuevo nombre.");
       await productsService.update(data.product_id!, { name: raw });
-      await sessionsService.reset(waFrom);
-      return text(`✅ Nombre actualizado a *${raw}*.`);
+      return finishEdit(`✅ Nombre actualizado a *${raw}*.`);
     }
 
     if (field === "price") {
       const price = parsePrice(raw);
       if (price === null) return text("No entendí el precio. Ejemplo: *45* o *45.50*");
       await productsService.update(data.product_id!, { price });
-      await sessionsService.reset(waFrom);
-      return text(`✅ Precio actualizado a *${formatPrice(price)}*.`);
+      return finishEdit(`✅ Precio actualizado a *${formatPrice(price)}*.`);
     }
 
     if (field === "description") {
       const val = isSkip(lower) ? null : raw || null;
       await productsService.update(data.product_id!, { description: val });
-      await sessionsService.reset(waFrom);
-      return text(val ? `✅ Descripción actualizada.` : `✅ Descripción eliminada.`);
+      return finishEdit(val ? `✅ Descripción actualizada.` : `✅ Descripción eliminada.`);
     }
 
     if (field === "category") {
       const val = isSkip(lower) ? null : raw || null;
       await productsService.update(data.product_id!, { category: val });
-      await sessionsService.reset(waFrom);
-      return text(val ? `✅ Categoría actualizada a *${val}*.` : `✅ Categoría eliminada.`);
+      return finishEdit(val ? `✅ Categoría actualizada a *${val}*.` : `✅ Categoría eliminada.`);
     }
 
     if (field === "photo") {
       if (isSkip(lower) || lower === "omitir") {
         await productsService.update(data.product_id!, { photo_url: null });
-        await sessionsService.reset(waFrom);
-        return text("✅ Foto eliminada.");
+        return finishEdit("✅ Foto eliminada.");
       }
 
       const incoming = (media ?? []).filter((m) => m.contentType.startsWith("image/"));
@@ -567,8 +608,7 @@ async function stepHandler(
           incoming[0].contentType
         );
         await productsService.update(data.product_id!, { photo_url: url });
-        await sessionsService.reset(waFrom);
-        return text("✅ Foto actualizada.");
+        return finishEdit("✅ Foto actualizada.");
       } catch (err) {
         console.error("[product.flow] edit photo failed:", (err as Error).message);
         await sessionsService.reset(waFrom);

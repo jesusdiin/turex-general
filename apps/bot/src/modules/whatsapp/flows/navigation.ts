@@ -38,7 +38,7 @@ export function mainMenuMessage(
       list,
       `*${newN}.* Registrar nuevo negocio`,
       "",
-      "Escribe el *número* para abrir un negocio.",
+      "Escribe el *número* o el *nombre* de tu negocio.",
     ].join("\n")
   );
 }

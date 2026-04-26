@@ -12,6 +12,7 @@ import {
   completedWithSubMenu,
 } from "./flows/navigation";
 import { detectIntent } from "./intents";
+import { resolveSubMenuOption, resolveMainMenuOption } from "./intents/nav-resolver";
 
 export interface IncomingMessage {
   from: string;
@@ -80,13 +81,15 @@ export async function handleIncomingMessage({
       return mainMenuMessage(contact.display_name, companies);
     }
 
-    if (lower === "0") {
+    const subOpt = resolveSubMenuOption(lower);
+
+    if (subOpt === 0) {
       await sessionsService.reset(from);
       const companies = await companiesService.listForContact(contact.id);
       return mainMenuMessage(contact.display_name, companies);
     }
 
-    if (lower === "1") {
+    if (subOpt === 1) {
       const newStatus = company.status === "OPEN" ? "CLOSED" : "OPEN";
       await companiesService.setStatus(company.id, newStatus);
       const updated = await companiesService.getById(company.id);
@@ -100,18 +103,18 @@ export async function handleIncomingMessage({
       }
     }
 
-    if (lower === "2") {
+    if (subOpt === 2) {
       const products = await productsService.listForCompany(company.id);
       return text(formatMenu(company.name, products));
     }
 
-    if (lower === "3") {
+    if (subOpt === 3) {
       const productData = { company_id: company.id, company_name: company.name };
       await sessionsService.set(from, "product_ask_name", productData);
       return text("¿Cuál es el *nombre* del producto?");
     }
 
-    if (lower === "4") {
+    if (subOpt === 4) {
       await sessionsService.set(from, "business_edit_pick_field", {
         company_id: company.id,
         company_name: company.name,
@@ -119,7 +122,7 @@ export async function handleIncomingMessage({
       return businessEditFlow.startEdit(company);
     }
 
-    if (lower === "5") {
+    if (subOpt === 5) {
       await sessionsService.set(from, "business_edit_confirm_delete", {
         company_id: company.id,
         company_name: company.name,
@@ -149,18 +152,19 @@ export async function handleIncomingMessage({
 
   const companies = await companiesService.listForContact(contact.id);
 
-  // Routing numérico desde menú principal
+  // Routing numérico + lenguaje natural desde menú principal
   const n = parseInt(lower, 10);
-  if (!isNaN(n) && n >= 1) {
-    if (n - 1 < companies.length) {
-      const chosen = companies[n - 1];
+  const mainOpt = !isNaN(n) && n >= 1 ? n : resolveMainMenuOption(lower, companies);
+  if (mainOpt !== null && mainOpt >= 1) {
+    if (mainOpt - 1 < companies.length) {
+      const chosen = companies[mainOpt - 1];
       await sessionsService.set(from, "business_submenu", {
         company_id: chosen.id,
         company_name: chosen.name,
       });
       return businessSubMenuMessage(chosen);
     }
-    if (n === companies.length + 1) {
+    if (mainOpt === companies.length + 1) {
       return startRegistration(contact);
     }
   }

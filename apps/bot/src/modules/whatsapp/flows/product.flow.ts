@@ -8,6 +8,7 @@ import { OutboundMessage } from "../../messaging/messages.service";
 import { env } from "../../../config/env";
 import { IntentMatch } from "../intents";
 import { businessSubMenuMessage, completedWithSubMenu } from "./navigation";
+import { resolveFromList, resolveProductEditField } from "../intents/nav-resolver";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -124,10 +125,11 @@ async function resolveCompanyPick(
   data: ProductFlowData
 ): Promise<Company | null> {
   const ids = data.company_ids ?? [];
-  const n = parseInt(raw, 10);
-  if (!ids.length || Number.isNaN(n) || n < 1 || n > ids.length) return null;
-  const companies = await companiesService.listForContact(contact.id);
-  return companies.find((c) => c.id === ids[n - 1]) ?? null;
+  if (!ids.length) return null;
+  const allCompanies = await companiesService.listForContact(contact.id);
+  const filtered = allCompanies.filter((c) => ids.includes(c.id));
+  const picked = resolveFromList(raw, filtered, (c) => c.name);
+  return picked !== null ? (filtered[picked - 1] ?? null) : null;
 }
 
 /* ── missing fields for LLM extraction ──────────────────────── */
@@ -436,8 +438,8 @@ async function stepHandler(
 
   if (step === "product_pick_delete") {
     const products = await productsService.listForCompany(data.company_id!);
-    const n = parseInt(raw, 10);
-    if (Number.isNaN(n) || n < 1 || n > products.length) {
+    const n = resolveFromList(raw, products, (p) => p.name);
+    if (n === null) {
       return text(`Necesito el número del producto:\n\n${productListText(products)}`);
     }
     const chosen = products[n - 1];
@@ -481,8 +483,8 @@ async function stepHandler(
 
   if (step === "product_pick_edit") {
     const products = await productsService.listForCompany(data.company_id!);
-    const n = parseInt(raw, 10);
-    if (Number.isNaN(n) || n < 1 || n > products.length) {
+    const n = resolveFromList(raw, products, (p) => p.name);
+    if (n === null) {
       return text(`Necesito el número del producto:\n\n${productListText(products)}`);
     }
     const chosen = products[n - 1];
@@ -494,7 +496,7 @@ async function stepHandler(
   }
 
   if (step === "product_pick_field") {
-    const n = parseInt(raw, 10);
+    const fieldIdx = resolveProductEditField(raw);
     const fieldMap: Record<number, string> = {
       1: "name",
       2: "price",
@@ -503,7 +505,7 @@ async function stepHandler(
       5: "photo",
       6: "available",
     };
-    const field = fieldMap[n];
+    const field = fieldIdx !== null ? fieldMap[fieldIdx] : undefined;
     if (!field) {
       return text(`Elige una opción del 1 al 6:\n\n${EDIT_FIELDS_MENU}`);
     }

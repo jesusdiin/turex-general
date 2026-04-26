@@ -60,3 +60,50 @@ export function resolveMainMenuOption(input: string, companies: Company[]): numb
     .filter(({ name }) => name.length > 2 && (t.includes(name) || name.includes(t)));
   return matches.length === 1 ? matches[0].i : null;
 }
+
+export function resolveFromList<T>(
+  input: string,
+  items: T[],
+  getName: (item: T) => string
+): number | null {
+  const t = normalize(input);
+  const n = parseInt(t, 10);
+  if (!isNaN(n) && n >= 1 && n <= items.length) return n;
+
+  const matches = items
+    .map((item, i) => ({ i: i + 1, name: normalize(getName(item)) }))
+    .filter(({ name }) => name.length > 1 && (t.includes(name) || name.includes(t)));
+
+  return matches.length === 1 ? matches[0].i : null;
+}
+
+export function resolveBusinessEditField(input: string): number | null {
+  const t = normalize(input);
+  const n = parseInt(t, 10);
+  if (!isNaN(n) && n >= 0 && n <= 5) return n;
+
+  if (["volver", "regresar", "atras", "salir"].some((p) => t.includes(p))) return 0;
+  if (t === "nombre" || ["cambiar nombre", "editar nombre"].some((p) => t.includes(p))) return 1;
+  if (["categoria", "rubro", "tipo"].some((p) => t.includes(p))) return 2;
+  if (["ubicacion", "direccion", "localizacion", "donde", "lugar"].some((p) => t.includes(p))) return 3;
+  if (["telefono", "celular", "contacto"].some((p) => t.includes(p))) return 4;
+  if (["foto", "imagen"].some((p) => t.includes(p))) return 5;
+
+  return null;
+}
+
+export function resolveProductEditField(input: string): number | null {
+  const t = normalize(input);
+  const n = parseInt(t, 10);
+  if (!isNaN(n) && n >= 1 && n <= 6) return n;
+
+  if (["cambiar nombre", "editar nombre", "nombre del producto"].some((p) => t.includes(p))) return 1;
+  if (t === "nombre") return 1;
+  if (["precio", "costo", "valor"].some((p) => t.includes(p))) return 2;
+  if (["descripcion", "detalle", "informacion"].some((p) => t.includes(p))) return 3;
+  if (["categoria", "tipo", "rubro"].some((p) => t.includes(p))) return 4;
+  if (["foto", "imagen"].some((p) => t.includes(p))) return 5;
+  if (["disponible", "activo", "disponibilidad"].some((p) => t.includes(p))) return 6;
+
+  return null;
+}

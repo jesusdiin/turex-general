@@ -12,6 +12,7 @@ import { OutboundMessage } from "../../messaging/messages.service";
 import { photosService } from "../../companies/photos.service";
 import { env } from "../../../config/env";
 import { businessSubMenuMessage, completedWithSubMenu, mainMenuMessage } from "./navigation";
+import { resolveFromList } from "../intents/nav-resolver";
 
 type Step =
   | "pick_company_status"
@@ -279,29 +280,21 @@ export const registrationFlow = {
         const status = data.status ?? "OPEN";
         const verb = statusVerb(status);
         const ids = data.company_ids ?? [];
-        const n = parseInt(raw, 10);
+        const allCompanies = await companiesService.listForContact(contact.id);
+        const filtered = ids.length ? allCompanies.filter((c) => ids.includes(c.id)) : allCompanies;
 
-        if (!ids.length || Number.isNaN(n) || n < 1 || n > ids.length) {
-          const companies = await companiesService.listForContact(contact.id);
+        const picked = resolveFromList(raw, filtered, (c) => c.name);
+        if (picked === null) {
           await sessionsService.set(waFrom, "pick_company_status", {
             status,
-            company_ids: companies.map((c) => c.id),
+            company_ids: filtered.map((c) => c.id),
           });
-          return pickCompanyMessage(companies, status);
+          return pickCompanyMessage(filtered, status);
         }
 
-        const chosenId = ids[n - 1];
-        const companies = await companiesService.listForContact(contact.id);
-        const chosen = companies.find((c) => c.id === chosenId);
-        if (!chosen) {
-          await sessionsService.set(waFrom, "pick_company_status", {
-            status,
-            company_ids: companies.map((c) => c.id),
-          });
-          return pickCompanyMessage(companies, status);
-        }
-        await companiesService.setStatus(chosenId, status);
-        const freshCompany = await companiesService.getById(chosenId);
+        const chosen = filtered[picked - 1];
+        await companiesService.setStatus(chosen.id, status);
+        const freshCompany = await companiesService.getById(chosen.id);
         if (freshCompany) {
           await sessionsService.set(waFrom, "business_submenu", {
             company_id: freshCompany.id,
@@ -416,12 +409,12 @@ export const registrationFlow = {
 
       case "pick_category": {
         const { list } = await listIndustriesText();
-        const n = parseInt(raw, 10);
-        if (Number.isNaN(n) || n < 1 || n > list.length) {
+        const picked = resolveFromList(raw, list, (i) => i.name);
+        if (picked === null) {
           const { text: listText } = await listIndustriesText();
           return text(`Necesito el número de la opción. Intenta de nuevo:\n\n${listText}`);
         }
-        const chosen = list[n - 1];
+        const chosen = list[picked - 1];
         data.industry_id = chosen.id;
         data.industry_name = chosen.name;
         await sessionsService.set(waFrom, "ask_location", data);

@@ -6,6 +6,7 @@ import { normalizeAnswer } from "../../../lib/llm";
 import { photosService } from "../../companies/photos.service";
 import { OutboundMessage } from "../../messaging/messages.service";
 import { businessSubMenuMessage, completedWithSubMenu, mainMenuMessage } from "./navigation";
+import { resolveBusinessEditField, resolveFromList } from "../intents/nav-resolver";
 
 const text = (body: string): OutboundMessage => ({ kind: "text", body });
 
@@ -89,28 +90,26 @@ export const businessEditFlow = {
     /* ── pick field ──────────────────────────────────────────── */
 
     if (step === "business_edit_pick_field") {
-      if (lower === "0") {
-        return goToSubMenu(waFrom, company_id, "");
-      }
+      const editOpt = resolveBusinessEditField(raw);
 
-      const n = parseInt(raw, 10);
-      if (n === 1) {
+      if (editOpt === 0) return goToSubMenu(waFrom, company_id, "");
+      if (editOpt === 1) {
         await sessionsService.set(waFrom, "business_edit_name", data);
         return text(`¿Cuál será el nuevo nombre del negocio?`);
       }
-      if (n === 2) {
+      if (editOpt === 2) {
         await sessionsService.set(waFrom, "business_edit_category", data);
         return text(
           `¿A qué se dedica tu negocio? Por ejemplo: "restaurante", "hotel", "estilista".`
         );
       }
-      if (n === 3) {
+      if (editOpt === 3) {
         await sessionsService.set(waFrom, "business_edit_location", data);
         return text(
           `¿Cuál es la nueva ubicación? Puedes escribir *omitir* para dejarla en blanco.`
         );
       }
-      if (n === 4) {
+      if (editOpt === 4) {
         await sessionsService.set(waFrom, "business_edit_phone", data);
         const myPhone = phoneFromWaFrom(waFrom);
         return text(
@@ -118,7 +117,7 @@ export const businessEditFlow = {
             `Tu número actual es *${myPhone}*. Escríbelo o *omitir* para dejarlo en blanco.`
         );
       }
-      if (n === 5) {
+      if (editOpt === 5) {
         await sessionsService.set(waFrom, "business_edit_photos", {
           ...data,
           photo_count: 0,
@@ -182,12 +181,12 @@ export const businessEditFlow = {
 
     if (step === "business_edit_pick_category") {
       const { list } = await listIndustriesText();
-      const n = parseInt(raw, 10);
-      if (Number.isNaN(n) || n < 1 || n > list.length) {
+      const picked = resolveFromList(raw, list, (i) => i.name);
+      if (picked === null) {
         const { text: listText } = await listIndustriesText();
         return text(`Necesito el número de la opción:\n\n${listText}`);
       }
-      const chosen = list[n - 1];
+      const chosen = list[picked - 1];
       await companiesService.update(company_id, { industry_id: chosen.id });
       return goToSubMenu(
         waFrom,

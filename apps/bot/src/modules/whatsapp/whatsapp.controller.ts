@@ -17,13 +17,25 @@ export const whatsappController = {
       if (url) media.push({ url: String(url), contentType: String(ct ?? "") });
     }
 
+    const rawLat = req.body.Latitude;
+    const lat = parseFloat(String(rawLat));
+    const lng = parseFloat(String(req.body.Longitude));
+    const location = rawLat !== undefined && !isNaN(lat) && !isNaN(lng)
+      ? {
+          lat,
+          lng,
+          address: req.body.Address ? String(req.body.Address) : undefined,
+          label: req.body.Label ? String(req.body.Label) : undefined,
+        }
+      : undefined;
+
     // Respondemos rápido al webhook; el envío saliente va por REST API
     res.status(200).end();
 
     if (!from) return;
 
     try {
-      const out = await handleIncomingMessage({ from, body, buttonPayload, media });
+      const out = await handleIncomingMessage({ from, body, buttonPayload, media, location });
       await messagesService.send(from, out);
     } catch (err) {
       console.error("[whatsapp.webhook] error:", err);

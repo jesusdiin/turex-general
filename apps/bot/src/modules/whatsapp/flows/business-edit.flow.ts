@@ -78,7 +78,8 @@ export const businessEditFlow = {
     contact: WaContact,
     session: WaSession,
     body: string,
-    media?: { url: string; contentType: string }[]
+    media?: { url: string; contentType: string }[],
+    location?: { lat: number; lng: number; address?: string }
   ): Promise<OutboundMessage> {
     const raw = (body ?? "").trim();
     const lower = raw.toLowerCase();
@@ -106,7 +107,7 @@ export const businessEditFlow = {
       if (editOpt === 3) {
         await sessionsService.set(waFrom, "business_edit_location", data);
         return text(
-          `¿Cuál es la nueva ubicación? Puedes escribir *omitir* para dejarla en blanco.`
+          `¿Cuál es la nueva ubicación? Puedes compartir tu *ubicación* 📍 desde WhatsApp, o escribir la dirección. Escribe *omitir* para dejarla en blanco.`
         );
       }
       if (editOpt === 4) {
@@ -198,16 +199,31 @@ export const businessEditFlow = {
     /* ── edit location ───────────────────────────────────────── */
 
     if (step === "business_edit_location") {
-      let location: string | null;
-      if (isSkip(lower) || !raw) {
-        location = null;
+      let locationText: string | null;
+      let locationLat: number | null = null;
+      let locationLng: number | null = null;
+
+      if (location) {
+        locationLat = location.lat;
+        locationLng = location.lng;
+        locationText = location.address ?? "📍 Ubicación compartida";
+      } else if (isSkip(lower) || !raw) {
+        locationText = null;
       } else {
-        location = await normalizeAnswer("location", raw);
+        locationText = await normalizeAnswer("location", raw);
       }
-      await companiesService.update(company_id, { location_text: location });
-      const msg = location
-        ? `✅ Ubicación actualizada a *${location}*.`
-        : "✅ Ubicación eliminada.";
+
+      await companiesService.update(company_id, {
+        location_text: locationText,
+        location_lat: locationLat,
+        location_lng: locationLng,
+      });
+
+      const msg = locationLat != null
+        ? `✅ Ubicación actualizada (📍 pin compartido).`
+        : locationText
+          ? `✅ Ubicación actualizada a *${locationText}*.`
+          : "✅ Ubicación eliminada.";
       return goToSubMenu(waFrom, company_id, msg);
     }
 

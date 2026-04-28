@@ -33,6 +33,8 @@ interface FlowData {
   industry_id?: string;
   industry_name?: string;
   location_text?: string | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
   business_phone?: string | null;
   status?: "OPEN" | "CLOSED";
   company_ids?: string[];
@@ -132,12 +134,15 @@ function yesNoOther(question: string): OutboundMessage {
 }
 
 function summaryText(d: FlowData): string {
+  const locationDisplay = d.location_lat != null
+    ? `📍 ${d.location_text}`
+    : (d.location_text ?? "—");
   return [
     "📋 *Revisa tus datos:*",
     `• Tu nombre: ${d.display_name}`,
     `• Negocio: ${d.business_name}`,
     `• Categoría: ${d.industry_name}`,
-    `• Ubicación: ${d.location_text ?? "—"}`,
+    `• Ubicación: ${locationDisplay}`,
     `• Teléfono del negocio: ${d.business_phone ?? "—"}`,
     "",
     "¿Confirmas el registro?",
@@ -158,7 +163,7 @@ const COPY = {
   ask_category:
     '¿A qué se dedica tu negocio? Por ejemplo: "vendo tacos", "tengo un hotel", "soy estilista".',
   ask_location:
-    "¿Dónde se encuentra tu negocio? (colonia, calle o ciudad). Puedes responder *omitir* si prefieres.",
+    "¿Dónde se encuentra tu negocio? Puedes compartir tu *ubicación* 📍 desde WhatsApp, o escribir la dirección (colonia, calle o ciudad). Escribe *omitir* si prefieres no indicarla.",
   ask_business_phone_value: "Escribe el número del negocio (ejemplo: +5215555555555).",
   invalid_phone:
     "Ese número no parece válido. Intenta de nuevo (ejemplo: +5215555555555).",
@@ -260,7 +265,8 @@ export const registrationFlow = {
     contact: WaContact,
     session: WaSession | null,
     body: string,
-    media?: { url: string; contentType: string }[]
+    media?: { url: string; contentType: string }[],
+    location?: { lat: number; lng: number; address?: string }
   ): Promise<OutboundMessage> {
     const raw = (body ?? "").trim();
     const lower = raw.toLowerCase();
@@ -422,8 +428,14 @@ export const registrationFlow = {
       }
 
       case "ask_location": {
-        if (isSkip(lower) || !raw) {
+        if (location) {
+          data.location_lat = location.lat;
+          data.location_lng = location.lng;
+          data.location_text = location.address ?? "📍 Ubicación compartida";
+        } else if (isSkip(lower) || !raw) {
           data.location_text = null;
+          data.location_lat = null;
+          data.location_lng = null;
         } else {
           const extracted = await extractRegistrationFields(raw, missingFields(data));
           await applyExtracted(data, extracted);
@@ -432,6 +444,8 @@ export const registrationFlow = {
           } else {
             data.location_text = await normalizeAnswer("location", raw);
           }
+          data.location_lat = null;
+          data.location_lng = null;
         }
         const next = nextStepFor(data);
         await sessionsService.set(waFrom, next, data);
@@ -472,6 +486,8 @@ export const registrationFlow = {
             name: data.business_name!,
             industryId: data.industry_id!,
             locationText: data.location_text ?? null,
+            locationLat: data.location_lat ?? null,
+            locationLng: data.location_lng ?? null,
             businessPhone: data.business_phone ?? null,
           });
           await sessionsService.set(waFrom, "ask_photos", {

@@ -8,6 +8,8 @@ export interface Company {
   name: string;
   industry_id: string;
   location_text: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
   business_phone: string | null;
   status: CompanyStatus;
   photo_urls: string[];
@@ -49,6 +51,8 @@ export const companiesService = {
       name: string;
       industryId: string;
       locationText?: string | null;
+      locationLat?: number | null;
+      locationLng?: number | null;
       businessPhone?: string | null;
     }
   ): Promise<Company> {
@@ -58,6 +62,8 @@ export const companiesService = {
         name: input.name,
         industry_id: input.industryId,
         location_text: input.locationText ?? null,
+        location_lat: input.locationLat ?? null,
+        location_lng: input.locationLng ?? null,
         business_phone: input.businessPhone ?? null,
       })
       .select()
@@ -84,7 +90,7 @@ export const companiesService = {
 
   async update(
     companyId: string,
-    fields: Partial<Pick<Company, "name" | "industry_id" | "location_text" | "business_phone" | "photo_urls">>
+    fields: Partial<Pick<Company, "name" | "industry_id" | "location_text" | "location_lat" | "location_lng" | "business_phone" | "photo_urls">>
   ): Promise<Company> {
     const { data, error } = await supabase
       .from("companies")

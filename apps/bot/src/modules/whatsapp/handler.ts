@@ -19,6 +19,7 @@ export interface IncomingMessage {
   body: string;
   buttonPayload?: string;
   media?: { url: string; contentType: string }[];
+  location?: { lat: number; lng: number; address?: string; label?: string };
 }
 
 const PAYLOAD_TO_TEXT: Record<string, string> = {
@@ -37,6 +38,7 @@ export async function handleIncomingMessage({
   body,
   buttonPayload,
   media,
+  location,
 }: IncomingMessage): Promise<OutboundMessage> {
   const effectiveBody = buttonPayload
     ? PAYLOAD_TO_TEXT[buttonPayload.toLowerCase()] ?? body
@@ -137,7 +139,7 @@ export async function handleIncomingMessage({
   /* ── 3. flujos activos ─────────────────────────────────────── */
 
   if (session?.step.startsWith("business_edit_")) {
-    return businessEditFlow.step(contact, session, effectiveBody, media);
+    return businessEditFlow.step(contact, session, effectiveBody, media, location);
   }
 
   if (session?.step.startsWith("product_")) {
@@ -145,7 +147,7 @@ export async function handleIncomingMessage({
   }
 
   if (session) {
-    return registrationFlow.step(contact, session, effectiveBody, media);
+    return registrationFlow.step(contact, session, effectiveBody, media, location);
   }
 
   /* ── 4. sin sesión: routing numérico + intents ─────────────── */

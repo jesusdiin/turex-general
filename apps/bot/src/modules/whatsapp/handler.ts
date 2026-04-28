@@ -1,5 +1,5 @@
 import { contactsService, phoneFromWaFrom } from "../contacts/contacts.service";
-import { companiesService } from "../companies/companies.service";
+import { companiesService, Company } from "../companies/companies.service";
 import { productsService } from "../products/products.service";
 import { sessionsService } from "../contacts/sessions.service";
 import { OutboundMessage } from "../messaging/messages.service";
@@ -13,6 +13,16 @@ import {
 } from "./flows/navigation";
 import { detectIntent } from "./intents";
 import { resolveSubMenuOption, resolveMainMenuOption } from "./intents/nav-resolver";
+import { normalize } from "./intents/normalize";
+
+function matchCompanyByName(text: string, companies: Company[]): Company | null {
+  const t = normalize(text);
+  const hits = companies.filter((c) => {
+    const name = normalize(c.name);
+    return name.length > 1 && (t.includes(name) || name.includes(t));
+  });
+  return hits.length === 1 ? hits[0] : null;
+}
 
 export interface IncomingMessage {
   from: string;
@@ -188,6 +198,19 @@ export async function handleIncomingMessage({
       }
     }
     if (companies.length > 1) {
+      const named = matchCompanyByName(effectiveBody, companies);
+      if (named) {
+        await companiesService.setStatus(named.id, status);
+        const updated = await companiesService.getById(named.id);
+        if (updated) {
+          await sessionsService.set(from, "business_submenu", {
+            company_id: updated.id,
+            company_name: updated.name,
+          });
+          const verb = updated.status === "OPEN" ? "abierto ✅" : "cerrado ❌";
+          return completedWithSubMenu(`✅ *${updated.name}* marcado como *${verb}*.`, updated);
+        }
+      }
       const { pickCompanyMessage } = await import("./flows/registration.flow");
       await sessionsService.set(from, "pick_company_status", {
         status,
